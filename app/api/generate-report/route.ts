@@ -9,9 +9,11 @@ function cleanAndParseJSON(text: string) {
   try {
     return JSON.parse(text);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      return JSON.parse(match[0]);
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      const jsonCandidate = text.substring(firstBrace, lastBrace + 1);
+      return JSON.parse(jsonCandidate);
     }
     throw new Error("Could not parse valid JSON from AI response.");
   }
@@ -22,44 +24,42 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { clientName, niche, period, adSpend, revenue, leads, cpa, roas, notes } = body;
 
-    const systemPrompt = `You are an elite Performance Marketing Agency Account Director writing a C-level executive client report.
-Analyze the client's marketing campaign data and return ONLY a raw, strictly valid JSON object (no markdown quotes, no backticks, no preamble) matching this schema:
+    const systemPrompt = `You are a Principal Performance Marketing Director writing an executive C-level monthly report.
+You must respond ONLY with a strictly valid JSON object matching this schema:
 {
-  "executiveSummary": "2-3 high-impact sentences summarizing the month's performance and bottom-line commercial impact.",
-  "performanceVerdict": "Exceeded Targets" | "Profitable Scale" | "Requires Pivot",
+  "executiveSummary": "2-3 high-impact sentences summarizing the month's performance and commercial profit impact.",
+  "performanceVerdict": "Exceeded Targets",
   "kpiAnalysis": [
     {
-      "metric": "ROAS / Revenue",
-      "status": "Healthy / Needs Optimization",
-      "commentary": "Actionable analytical insight on return on ad spend."
+      "metric": "ROAS & Attribution",
+      "status": "Healthy",
+      "commentary": "Short clear performance breakdown."
     },
     {
-      "metric": "CPA & Acquisition Efficiency",
-      "status": "Healthy / Needs Optimization",
-      "commentary": "Insight into customer acquisition cost vs targets."
+      "metric": "CPA & Acquisition Cost",
+      "status": "Optimizing",
+      "commentary": "Cost efficiency feedback."
     }
   ],
   "strategicWins": [
-    "Key campaign win or creative breakout from this period"
+    "Winning creative or funnel scaling breakthrough"
   ],
   "nextMonthActionPlan": [
-    "Specific tactical action planned for next sprint to improve profitability"
+    "High-impact operational next step"
   ]
 }`;
 
-    const userPrompt = `Client: ${clientName || "Brand Client"}
-Niche: ${niche || "Direct-to-Consumer"}
+    const userPrompt = `Client: ${clientName || "DTC Beauty Brand"}
+Niche: ${niche || "Skincare"}
 Period: ${period || "Monthly"}
-Total Ad Spend: $${adSpend || "0"}
-Generated Revenue: $${revenue || "0"}
-Total Leads / Purchases: ${leads || "0"}
-Cost Per Acquisition (CPA): $${cpa || "0"}
-Blended ROAS: ${roas || "0"}x
-Agency Notes: ${notes || "Scale winning ad sets and refine landing page conversion."}
+Total Ad Spend: $${adSpend || "16500"}
+Generated Revenue: $${revenue || "57960"}
+Total Purchases: ${leads || "1200"}
+CPA: $${cpa || "13.75"}
+Blended ROAS: ${roas || "3.51"}x
+Notes: ${notes || "Scale high-performing Meta UGC sets and expand to Google Search."}`;
 
-Synthesize this data into an executive board-level report. Return strictly raw JSON.`;
-
-    // Fetch dynamic models
+    // Available models ko fetch karein
     const modelListRes = await groq.models.list();
     const candidateIds = modelListRes.data
       .map((m: any) => m.id)
@@ -99,7 +99,9 @@ Synthesize this data into an executive board-level report. Return strictly raw J
             { role: "user", content: userPrompt },
           ],
           model: model,
-          temperature: 0.4,
+          temperature: 0.3,
+          max_tokens: 2048,
+          response_format: { type: "json_object" },
         });
 
         if (completion?.choices[0]?.message?.content) {
@@ -107,6 +109,7 @@ Synthesize this data into an executive board-level report. Return strictly raw J
         }
       } catch (err: any) {
         lastError = err;
+        console.warn(`Groq model ${model} failed, trying next candidate...`);
       }
     }
 
