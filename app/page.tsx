@@ -1,120 +1,100 @@
 "use client";
 
 import React, { useState } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { 
+  Sparkles, 
   TrendingUp, 
   DollarSign, 
   BarChart3, 
-  FileDown, 
-  Sparkles, 
-  AlertTriangle, 
+  Wallet, 
+  ArrowRightLeft, 
   CheckCircle2, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  Layers,
-  Building2,
-  RefreshCw,
-  SlidersHorizontal
+  RefreshCw, 
+  Copy, 
+  Check, 
+  FileText 
 } from "lucide-react";
 
 interface Campaign {
   channel: string;
-  name: string;
+  campaign: string;
   spend: number;
   revenue: number;
   roas: number;
   cpa: number;
-  status: "Active" | "Paused";
+  status: "Active" | "Paused" | "Optimizing";
 }
 
-interface ReportData {
-  executiveSummary: string;
-  channelBreakdown: {
-    channel: string;
-    verdict: "SCALING" | "OPTIMIZING" | "BLEEDING";
-    commentary: string;
-  }[];
-  winningCampaigns: {
-    name: string;
-    insight: string;
-  }[];
-  bleedingCampaigns: {
-    name: string;
-    criticalIssue: string;
-  }[];
-  actionPlanNextMonth: {
-    priority: "HIGH" | "MEDIUM" | "LOW";
-    initiative: string;
-    budgetAdjustment: string;
-    expectedImpact: string;
-  }[];
+interface ReallocationItem {
+  fromCampaign: string;
+  toCampaign: string;
+  shiftAmount: string;
+  rationale: string;
 }
 
-const PRESET_DTC: {
-  clientName: string;
-  auditMonth: string;
-  campaigns: Campaign[];
-} = {
-  clientName: "Aura Skincare & Wellness",
-  auditMonth: "August 2026",
+interface AuditReport {
+  executiveVerdict: string;
+  cmoSummary: string;
+  budgetReallocations: ReallocationItem[];
+  strategicWins: string[];
+  immediateActionPlan: string[];
+}
+
+const PRESET_SKINCARE: { name: string; campaigns: Campaign[] } = {
+  name: "DTC Skincare ($16.5k Spend)",
   campaigns: [
-    { channel: "Meta Ads", name: "TOF - Broad Video Hooks (Collagen Serum)", spend: 6400, revenue: 26880, roas: 4.2, cpa: 19.5, status: "Active" },
-    { channel: "Meta Ads", name: "MOF - Social Proof & UGC Testimonials", spend: 3200, revenue: 11520, roas: 3.6, cpa: 22.0, status: "Active" },
-    { channel: "Google Ads", name: "High-Intent Search - Brand Core", spend: 1800, revenue: 11700, roas: 6.5, cpa: 11.2, status: "Active" },
-    { channel: "Google Ads", name: "Performance Max - Generic Beauty", spend: 2900, revenue: 5220, roas: 1.8, cpa: 48.0, status: "Active" },
-    { channel: "TikTok Ads", name: "Spark Ads - Micro Influencer Cuts", spend: 2200, revenue: 2640, roas: 1.2, cpa: 62.5, status: "Paused" },
+    { channel: "Meta Ads", campaign: "TOF - Broad Video Hooks (Collagen Serum)", spend: 6400, revenue: 26880, roas: 4.2, cpa: 19.5, status: "Active" },
+    { channel: "Meta Ads", campaign: "MOF - Social Proof & UGC Testimonials", spend: 3200, revenue: 11520, roas: 3.6, cpa: 22.0, status: "Active" },
+    { channel: "Google Ads", campaign: "High-Intent Search - Brand Core", spend: 1800, revenue: 11700, roas: 6.5, cpa: 11.2, status: "Active" },
+    { channel: "Google Ads", campaign: "Performance Max - Generic Beauty", spend: 2900, revenue: 5220, roas: 1.8, cpa: 48.0, status: "Active" },
+    { channel: "TikTok Ads", campaign: "Spark Ads UGC Influencer Whitelisting", spend: 2200, revenue: 2640, roas: 1.2, cpa: 52.0, status: "Paused" }
   ]
 };
 
-const PRESET_B2B: {
-  clientName: string;
-  auditMonth: string;
-  campaigns: Campaign[];
-} = {
-  clientName: "CloudScale ERP Solutions",
-  auditMonth: "August 2026",
+const PRESET_SAAS: { name: string; campaigns: Campaign[] } = {
+  name: "B2B SaaS Enterprise ($13.6k Spend)",
   campaigns: [
-    { channel: "Google Ads", name: "Search - Competitor Alternatives", spend: 4500, revenue: 18000, roas: 4.0, cpa: 85.0, status: "Active" },
-    { channel: "Google Ads", name: "Search - Enterprise ERP Software", spend: 5200, revenue: 13000, roas: 2.5, cpa: 140.0, status: "Active" },
-    { channel: "Meta Ads", name: "Founder Retargeting - Whitepaper Lead Gen", spend: 2100, revenue: 7350, roas: 3.5, cpa: 45.0, status: "Active" },
-    { channel: "Meta Ads", name: "Broad Lookalike - Case Study Carousel", spend: 1800, revenue: 2160, roas: 1.2, cpa: 195.0, status: "Paused" },
+    { channel: "Google Ads", campaign: "Search - Competitor Alternatives", spend: 4500, revenue: 18000, roas: 4.0, cpa: 85.0, status: "Active" },
+    { channel: "Google Ads", campaign: "Search - Enterprise ERP Software", spend: 5200, revenue: 13000, roas: 2.5, cpa: 140.0, status: "Active" },
+    { channel: "Meta Ads", campaign: "Founder Retargeting - Whitepaper Lead Gen", spend: 2100, revenue: 7350, roas: 3.5, cpa: 45.0, status: "Active" },
+    { channel: "Meta Ads", campaign: "Broad Lookalike - Case Study Carousel", spend: 1800, revenue: 2160, roas: 1.2, cpa: 195.0, status: "Paused" }
   ]
 };
 
-export default function PerformanceReporterPage() {
-  const [clientName, setClientName] = useState(PRESET_DTC.clientName);
-  const [auditMonth, setAuditMonth] = useState(PRESET_DTC.auditMonth);
-  const [campaigns, setCampaigns] = useState<Campaign[]>(PRESET_DTC.campaigns);
+export default function ClientPerformancePage() {
+  const [selectedPreset, setSelectedPreset] = useState<"skincare" | "saas">("skincare");
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<ReportData | null>(null);
+  const [audit, setAudit] = useState<AuditReport | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const totalSpend = campaigns.reduce((acc, c) => acc + c.spend, 0);
-  const totalRevenue = campaigns.reduce((acc, c) => acc + c.revenue, 0);
+  const activeData = selectedPreset === "skincare" ? PRESET_SKINCARE : PRESET_SAAS;
+
+  const totalSpend = activeData.campaigns.reduce((acc, c) => acc + c.spend, 0);
+  const totalRevenue = activeData.campaigns.reduce((acc, c) => acc + c.revenue, 0);
   const blendedRoas = (totalRevenue / (totalSpend || 1)).toFixed(2);
+  const netProfit = totalRevenue - totalSpend;
 
-  const handleGenerateReport = async () => {
+  const handleGenerateAudit = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/generate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientName,
-          auditMonth,
+          clientName: activeData.name,
+          campaigns: activeData.campaigns,
           totalSpend,
           totalRevenue,
           blendedRoas,
-          campaigns,
+          netProfit,
         }),
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setReport(data);
+      const json = await res.json();
+      if (res.ok && json.executiveVerdict) {
+        setAudit(json);
       } else {
-        alert("Failed to generate report: " + (data.error || "Unknown error"));
+        alert("Failed to generate audit: " + (json.error || "Unknown server response"));
       }
     } catch (err: any) {
       alert("Error: " + err.message);
@@ -123,290 +103,168 @@ export default function PerformanceReporterPage() {
     }
   };
 
-  const handleExportPDF = () => {
-    if (!report) return;
+  const copyFullReport = () => {
+    if (!audit) return;
+    const text = `EXECUTIVE PERFORMANCE AUDIT
+Verdict: ${audit.executiveVerdict}
 
-    const doc = new jsPDF();
-    const primaryColor = [15, 23, 42]; // Slate 900
-    const accentColor = [16, 185, 129]; // Emerald 500
+CMO SUMMARY:
+${audit.cmoSummary}
 
-    // Header Background
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 210, 38, "F");
+BUDGET REALLOCATIONS:
+${audit.budgetReallocations?.map((b) => `- Shift ${b.shiftAmount} from "${b.fromCampaign}" to "${b.toCampaign}" (${b.rationale})`).join("\n") || "None"}
 
-    // Title & Metadata
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.text("EXECUTIVE PERFORMANCE AUDIT", 14, 18);
+KEY WINS:
+${audit.strategicWins?.map((w) => `- ${w}`).join("\n") || "None"}
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`Client: ${clientName}  |  Period: ${auditMonth}  |  Generated by AI Insights Engine`, 14, 28);
+NEXT 7-DAY ACTION PLAN:
+${audit.immediateActionPlan?.map((a) => `- ${a}`).join("\n") || "None"}`;
 
-    // High Level Metric Strip
-    let currentY = 48;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("PORTFOLIO EFFICIENCY OVERVIEW", 14, currentY);
-
-    currentY += 6;
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Total Ad Spend", "Attributed Revenue", "Blended ROAS", "Net Contribution"]],
-      body: [[
-        `$${totalSpend.toLocaleString()}`,
-        `$${totalRevenue.toLocaleString()}`,
-        `${blendedRoas}x`,
-        `+$${(totalRevenue - totalSpend).toLocaleString()}`
-      ]],
-      theme: "grid",
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: "bold" },
-      styles: { fontSize: 10, halign: "center" }
-    });
-
-    currentY = (doc as any).lastAutoTable.finalY + 12;
-
-    // Executive Summary
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("CMO STRATEGIC SUMMARY", 14, currentY);
-
-    currentY += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.5);
-    doc.setTextColor(51, 65, 85);
-    const splitSummary = doc.splitTextToSize(report.executiveSummary, 182);
-    doc.text(splitSummary, 14, currentY);
-    currentY += splitSummary.length * 5 + 8;
-
-    // Campaign Performance Table
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("MULTI-CHANNEL CAMPAIGN PERFORMANCE", 14, currentY);
-
-    currentY += 4;
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Channel", "Campaign Name", "Spend", "Revenue", "ROAS", "CPA", "Status"]],
-      body: campaigns.map((c) => [
-        c.channel,
-        c.name,
-        `$${c.spend.toLocaleString()}`,
-        `$${c.revenue.toLocaleString()}`,
-        `${c.roas.toFixed(1)}x`,
-        `$${c.cpa.toFixed(1)}`,
-        c.status
-      ]),
-      theme: "striped",
-      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-      styles: { fontSize: 8.5 }
-    });
-
-    currentY = (doc as any).lastAutoTable.finalY + 12;
-
-    // Check if new page needed
-    if (currentY > 230) {
-      doc.addPage();
-      currentY = 20;
-    }
-
-    // Action Plan for Next Month
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("ACTIONABLE ROADMAP & BUDGET REALLOCATION", 14, currentY);
-
-    currentY += 4;
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Priority", "Initiative", "Budget Reallocation", "Projected Impact"]],
-      body: report.actionPlanNextMonth.map((a) => [
-        a.priority,
-        a.initiative,
-        a.budgetAdjustment,
-        a.expectedImpact
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
-      styles: { fontSize: 8.5 }
-    });
-
-    // Save PDF
-    doc.save(`${clientName.replace(/\s+/g, "_")}_Performance_Report_${auditMonth.replace(/\s+/g, "_")}.pdf`);
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
-      {/* Header Bar */}
+      {/* Header */}
       <div className="max-w-7xl mx-auto mb-8 border-b border-slate-800 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-medium mb-2">
             <Sparkles className="w-3.5 h-3.5" /> High-Ticket Marketing Automation #2
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Omnichannel Client Performance Reporter & Insights Engine
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Automates multi-channel ad audits, Gemini 3.6 Flash CMO diagnosis, and client-branded vector PDF exports.
+            Automates multi-channel ad audits, Groq LPU CMO diagnosis, and client-branded executive reports.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-xs text-slate-500 font-mono">RETAINER TOOL VALUE</p>
-            <p className="text-lg font-bold text-emerald-400">$800 - $1,200 / Mo</p>
-          </div>
+        <div className="text-right">
+          <p className="text-xs text-slate-500 font-mono">RETAINER TOOL VALUE</p>
+          <p className="text-lg font-bold text-emerald-400">$800 - $1,200 / Mo</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Top Control Bar & Presets */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-              <SlidersHorizontal className="w-3.5 h-3.5" /> Client Presets:
-            </span>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Controls Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium">Client Presets:</span>
             <button
-              onClick={() => {
-                setClientName(PRESET_DTC.clientName);
-                setAuditMonth(PRESET_DTC.auditMonth);
-                setCampaigns(PRESET_DTC.campaigns);
-                setReport(null);
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              onClick={() => { setSelectedPreset("skincare"); setAudit(null); }}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                selectedPreset === "skincare"
+                  ? "bg-slate-800 text-cyan-400 border-cyan-500/50 shadow"
+                  : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800"
+              }`}
             >
-              🛍️ DTC Skincare ($16.5k Spend)
+              DTC Skincare ($16.5k Spend)
             </button>
             <button
-              onClick={() => {
-                setClientName(PRESET_B2B.clientName);
-                setAuditMonth(PRESET_B2B.auditMonth);
-                setCampaigns(PRESET_B2B.campaigns);
-                setReport(null);
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              onClick={() => { setSelectedPreset("saas"); setAudit(null); }}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                selectedPreset === "saas"
+                  ? "bg-slate-800 text-cyan-400 border-cyan-500/50 shadow"
+                  : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800"
+              }`}
             >
-              💻 B2B SaaS Enterprise ($13.6k Spend)
+              B2B SaaS ($13.6k Spend)
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleGenerateReport}
-              disabled={loading}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-5 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition shadow-lg shadow-emerald-900/30"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Auditing Campaigns with Gemini...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate Strategic Audit
-                </>
-              )}
-            </button>
-
-            {report && (
-              <button
-                onClick={handleExportPDF}
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2.5 rounded-xl font-semibold text-sm text-slate-200 flex items-center gap-2 transition"
-              >
-                <FileDown className="w-4 h-4 text-emerald-400" />
-                Export Vector PDF
-              </button>
+          <button
+            onClick={handleGenerateAudit}
+            disabled={loading}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/40"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Auditing Omnichannel Attribution via Groq...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate Strategic Audit
+              </>
             )}
-          </div>
+          </button>
         </div>
 
-        {/* High-Level Overview Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-              <span>Total Ad Spend</span>
-              <DollarSign className="w-4 h-4 text-rose-400" />
+        {/* 4 Metric Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+            <div className="flex items-center justify-between text-rose-400 mb-2">
+              <span className="text-[11px] font-mono text-slate-400">Total Ad Spend</span>
+              <DollarSign className="w-4 h-4" />
             </div>
             <p className="text-2xl font-bold font-mono text-slate-100">${totalSpend.toLocaleString()}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Cross-channel aggregate</p>
+            <p className="text-[10px] text-slate-500 mt-1">Cross-channel aggregate</p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-              <span>Attributed Revenue</span>
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+            <div className="flex items-center justify-between text-emerald-400 mb-2">
+              <span className="text-[11px] font-mono text-slate-400">Attributed Revenue</span>
+              <TrendingUp className="w-4 h-4" />
             </div>
             <p className="text-2xl font-bold font-mono text-emerald-400">${totalRevenue.toLocaleString()}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Direct pixel attribution</p>
+            <p className="text-[10px] text-slate-500 mt-1">Direct pixel attribution</p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-              <span>Blended ROAS</span>
-              <BarChart3 className="w-4 h-4 text-blue-400" />
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+            <div className="flex items-center justify-between text-cyan-400 mb-2">
+              <span className="text-[11px] font-mono text-slate-400">Blended ROAS</span>
+              <BarChart3 className="w-4 h-4" />
             </div>
-            <p className="text-2xl font-bold font-mono text-blue-400">{blendedRoas}x</p>
-            <p className="text-[11px] text-slate-500 mt-1">Revenue ÷ Spend multiplier</p>
+            <p className="text-2xl font-bold font-mono text-cyan-400">{blendedRoas}x</p>
+            <p className="text-[10px] text-slate-500 mt-1">Revenue / Spend multiplier</p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-              <span>Net Ad Profit</span>
-              <Layers className="w-4 h-4 text-purple-400" />
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+            <div className="flex items-center justify-between text-violet-400 mb-2">
+              <span className="text-[11px] font-mono text-slate-400">Net Ad Profit</span>
+              <Wallet className="w-4 h-4" />
             </div>
-            <p className="text-2xl font-bold font-mono text-purple-400">+${(totalRevenue - totalSpend).toLocaleString()}</p>
-            <p className="text-[11px] text-slate-500 mt-1">Gross margin before COGS</p>
+            <p className="text-2xl font-bold font-mono text-slate-100">+${netProfit.toLocaleString()}</p>
+            <p className="text-[10px] text-slate-500 mt-1">Gross margin before COGS</p>
           </div>
         </div>
 
-        {/* Live Active Campaigns Table */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-400" /> Multi-Channel Campaigns Ingestion
-            </h2>
-            <span className="text-xs text-slate-400 font-mono">{campaigns.length} Active Feeds</span>
+        {/* Campaign Ingestion Table */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-200">Multi-Channel Campaigns Ingestion</h3>
+            <span className="text-xs text-slate-400 font-mono">{activeData.campaigns.length} Active Feeds</span>
           </div>
-
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 uppercase font-mono">
-                  <th className="py-3 px-3">Channel</th>
-                  <th className="py-3 px-3">Campaign</th>
-                  <th className="py-3 px-3">Spend</th>
-                  <th className="py-3 px-3">Revenue</th>
-                  <th className="py-3 px-3">ROAS</th>
-                  <th className="py-3 px-3">CPA</th>
-                  <th className="py-3 px-3">Status</th>
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-950/70 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="px-5 py-3">Channel</th>
+                  <th className="px-5 py-3">Campaign</th>
+                  <th className="px-5 py-3">Spend</th>
+                  <th className="px-5 py-3">Revenue</th>
+                  <th className="px-5 py-3">ROAS</th>
+                  <th className="px-5 py-3">CPA</th>
+                  <th className="px-5 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
-                {campaigns.map((c, i) => (
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                {activeData.campaigns.map((c, i) => (
                   <tr key={i} className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[11px] bg-slate-800 border border-slate-700 text-slate-300">
-                        {c.channel}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-slate-200 font-semibold">{c.name}</td>
-                    <td className="py-3 px-3 font-mono text-slate-300">${c.spend.toLocaleString()}</td>
-                    <td className="py-3 px-3 font-mono text-emerald-400">${c.revenue.toLocaleString()}</td>
-                    <td className="py-3 px-3 font-mono">
-                      <span className={c.roas >= 3 ? "text-emerald-400" : c.roas >= 2 ? "text-amber-400" : "text-rose-400"}>
-                        {c.roas.toFixed(1)}x
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-slate-300">${c.cpa.toFixed(1)}</td>
-                    <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        c.status === "Active" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-slate-700 text-slate-400"
+                    <td className="px-5 py-3 text-slate-300 font-sans">{c.channel}</td>
+                    <td className="px-5 py-3 text-slate-200 font-sans font-medium">{c.campaign}</td>
+                    <td className="px-5 py-3 text-slate-300">${c.spend.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-emerald-400">${c.revenue.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-cyan-300 font-bold">{c.roas}x</td>
+                    <td className="px-5 py-3 text-slate-300">${c.cpa.toFixed(2)}</td>
+                    <td className="px-5 py-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] ${
+                        c.status === "Active"
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                       }`}>
                         {c.status}
                       </span>
@@ -418,109 +276,81 @@ export default function PerformanceReporterPage() {
           </div>
         </div>
 
-        {/* AI Strategic Intelligence Audit (Shown When Generated) */}
-        {report && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            
-            {/* Executive Summary Card */}
-            <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -z-10" />
-              <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm mb-3">
-                <Sparkles className="w-4 h-4" /> Chief Marketing Officer (CMO) Strategic Audit
+        {/* AI Strategic Audit Section */}
+        {audit && (
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-emerald-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <span className="text-[10px] uppercase font-mono px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                  {audit.executiveVerdict}
+                </span>
+                <h2 className="text-lg font-bold text-slate-100 mt-2">Executive CMO Strategy & Reallocation Audit</h2>
               </div>
-              <p className="text-slate-300 text-sm leading-relaxed">
-                {report.executiveSummary}
-              </p>
+              <button
+                onClick={copyFullReport}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition border border-slate-700"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? "Report Copied" : "Copy Report"}
+              </button>
             </div>
 
-            {/* Channel Breakdown Verdicts */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {report.channelBreakdown.map((item, idx) => (
-                <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-sm text-slate-200">{item.channel}</h3>
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                      item.verdict === "SCALING" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                      item.verdict === "OPTIMIZING" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                      "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                    }`}>
-                      {item.verdict}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    {item.commentary}
-                  </p>
-                </div>
-              ))}
+            {/* CMO Summary */}
+            <div className="bg-slate-950/80 border border-slate-800/80 p-4 rounded-xl">
+              <span className="text-[10px] uppercase font-mono text-slate-500 block mb-1">Executive Commentary</span>
+              <p className="text-xs text-slate-200 leading-relaxed">{audit.cmoSummary}</p>
             </div>
 
-            {/* Winning vs Bleeding Campaigns */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Winners */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                <h3 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
-                  <ArrowUpRight className="w-4 h-4" /> Winning Campaign Drivers
-                </h3>
-                <div className="space-y-3">
-                  {report.winningCampaigns.map((w, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                      <p className="text-xs font-bold text-slate-200 mb-1">{w.name}</p>
-                      <p className="text-[11px] text-slate-400">{w.insight}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bleeders */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                <h3 className="text-sm font-semibold text-rose-400 mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Bleeding Campaigns & Waste
-                </h3>
-                <div className="space-y-3">
-                  {report.bleedingCampaigns.map((b, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                      <p className="text-xs font-bold text-slate-200 mb-1">{b.name}</p>
-                      <p className="text-[11px] text-slate-400">{b.criticalIssue}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Actionable Next-Month Roadmap */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Next Month Strategic Initiatives & Budget Shifts
-              </h3>
-
+            {/* Budget Reallocations */}
+            {audit.budgetReallocations && audit.budgetReallocations.length > 0 && (
               <div className="space-y-3">
-                {report.actionPlanNextMonth.map((action, idx) => (
-                  <div key={idx} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          action.priority === "HIGH" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
-                          action.priority === "MEDIUM" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                          "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                        }`}>
-                          {action.priority} PRIORITY
-                        </span>
-                        <h4 className="font-semibold text-slate-200 text-sm">{action.initiative}</h4>
+                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                  <ArrowRightLeft className="w-4 h-4" /> Capital Reallocation Recommendations
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {audit.budgetReallocations.map((b, idx) => (
+                    <div key={idx} className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl text-xs space-y-2">
+                      <div className="flex items-center justify-between font-mono">
+                        <span className="text-rose-400 line-through truncate max-w-[45%]">{b.fromCampaign}</span>
+                        <span className="text-slate-500">→</span>
+                        <span className="text-emerald-400 font-bold truncate max-w-[45%]">{b.toCampaign}</span>
                       </div>
-                      <p className="text-slate-400 text-[11px]">{action.expectedImpact}</p>
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/60">
+                        <span className="text-cyan-300 font-mono font-semibold">Shift: {b.shiftAmount}</span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">{b.rationale}</p>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                    <div className="shrink-0 bg-slate-900 border border-slate-700/60 px-3 py-1.5 rounded-lg text-emerald-400 font-mono font-medium">
-                      {action.budgetAdjustment}
-                    </div>
-                  </div>
-                ))}
+            {/* Wins & Action Items */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-2 text-xs">
+                <span className="text-emerald-400 font-bold uppercase font-mono text-[10px] flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Breakthrough Wins
+                </span>
+                <ul className="list-disc list-inside text-slate-300 space-y-1 text-[11px]">
+                  {audit.strategicWins?.map((win, i) => (
+                    <li key={i}>{win}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-2 text-xs">
+                <span className="text-amber-400 font-bold uppercase font-mono text-[10px] flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5" /> 7-Day Sprint Action Plan
+                </span>
+                <ul className="list-disc list-inside text-slate-300 space-y-1 text-[11px]">
+                  {audit.immediateActionPlan?.map((plan, i) => (
+                    <li key={i}>{plan}</li>
+                  ))}
+                </ul>
               </div>
             </div>
-
           </div>
         )}
-
       </div>
     </main>
   );

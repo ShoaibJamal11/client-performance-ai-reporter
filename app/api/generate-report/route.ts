@@ -12,8 +12,7 @@ function cleanAndParseJSON(text: string) {
     const firstBrace = text.indexOf("{");
     const lastBrace = text.lastIndexOf("}");
     if (firstBrace !== -1 && lastBrace !== -1) {
-      const jsonCandidate = text.substring(firstBrace, lastBrace + 1);
-      return JSON.parse(jsonCandidate);
+      return JSON.parse(text.substring(firstBrace, lastBrace + 1));
     }
     throw new Error("Could not parse valid JSON from AI response.");
   }
@@ -22,44 +21,41 @@ function cleanAndParseJSON(text: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { clientName, niche, period, adSpend, revenue, leads, cpa, roas, notes } = body;
+    const { clientName, campaigns, totalSpend, totalRevenue, blendedRoas, netProfit } = body;
 
-    const systemPrompt = `You are a Principal Performance Marketing Director writing an executive C-level monthly report.
-You must respond ONLY with a strictly valid JSON object matching this schema:
+    const systemPrompt = `You are an elite Performance Marketing CMO and Media Buying Director analyzing omnichannel ad spend.
+Analyze the client's campaign data and return ONLY a raw JSON object strictly adhering to this schema:
 {
-  "executiveSummary": "2-3 high-impact sentences summarizing the month's performance and commercial profit impact.",
-  "performanceVerdict": "Exceeded Targets",
-  "kpiAnalysis": [
+  "executiveVerdict": "Profitable Scale / Budget Reallocation Required",
+  "cmoSummary": "2-3 sharp direct-response sentences explaining why this performance occurred and where efficiency is leaking.",
+  "budgetReallocations": [
     {
-      "metric": "ROAS & Attribution",
-      "status": "Healthy",
-      "commentary": "Short clear performance breakdown."
-    },
-    {
-      "metric": "CPA & Acquisition Cost",
-      "status": "Optimizing",
-      "commentary": "Cost efficiency feedback."
+      "fromCampaign": "Specific low-performing campaign name",
+      "toCampaign": "High ROAS winning campaign name",
+      "shiftAmount": "$1,000 - $2,500/mo",
+      "rationale": "Clear ROAS and CPA justification for moving this budget."
     }
   ],
   "strategicWins": [
-    "Winning creative or funnel scaling breakthrough"
+    "Key performance win or winning creative angle"
   ],
-  "nextMonthActionPlan": [
-    "High-impact operational next step"
+  "immediateActionPlan": [
+    "High-impact execution step for the upcoming 7-day sprint"
   ]
 }`;
 
-    const userPrompt = `Client: ${clientName || "DTC Beauty Brand"}
-Niche: ${niche || "Skincare"}
-Period: ${period || "Monthly"}
-Total Ad Spend: $${adSpend || "16500"}
-Generated Revenue: $${revenue || "57960"}
-Total Purchases: ${leads || "1200"}
-CPA: $${cpa || "13.75"}
-Blended ROAS: ${roas || "3.51"}x
-Notes: ${notes || "Scale high-performing Meta UGC sets and expand to Google Search."}`;
+    const userPrompt = `Client: ${clientName || "E-Commerce Client"}
+Total Ad Spend: $${totalSpend}
+Attributed Revenue: $${totalRevenue}
+Blended ROAS: ${blendedRoas}x
+Net Ad Profit: $${netProfit}
 
-    // Available models ko fetch karein
+Active Campaigns:
+${JSON.stringify(campaigns, null, 2)}
+
+Provide the executive CMO audit and budget reallocation matrix. Return strictly raw JSON.`;
+
+    // Fetch active production models
     const modelListRes = await groq.models.list();
     const candidateIds = modelListRes.data
       .map((m: any) => m.id)
@@ -109,7 +105,7 @@ Notes: ${notes || "Scale high-performing Meta UGC sets and expand to Google Sear
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`Groq model ${model} failed, trying next candidate...`);
+        console.warn(`Groq model ${model} failed, trying next...`);
       }
     }
 
@@ -121,9 +117,9 @@ Notes: ${notes || "Scale high-performing Meta UGC sets and expand to Google Sear
     const parsedData = cleanAndParseJSON(responseContent);
     return NextResponse.json(parsedData);
   } catch (error: any) {
-    console.error("Report Generation Error:", error);
+    console.error("Audit Generation Error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to generate executive report" },
+      { error: error.message || "Failed to generate strategic audit" },
       { status: 500 }
     );
   }
